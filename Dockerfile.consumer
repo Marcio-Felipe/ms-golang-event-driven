@@ -1,0 +1,10 @@
+FROM golang:1.22-alpine AS builder
+WORKDIR /app
+COPY go.mod .
+RUN go mod download
+COPY . .
+RUN go build -o /bin/consumer ./cmd/consumer
+
+FROM alpine:3.20
+COPY --from=builder /bin/consumer /consumer
+CMD ["/consumer"]
