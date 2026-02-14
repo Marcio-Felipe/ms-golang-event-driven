@@ -1,48 +1,80 @@
-# Microserviço simples com RabbitMQ (treino)
+# Event-Driven Order and Payment Services with RabbitMQ
 
-Projeto mínimo em Go para praticar comunicação assíncrona com RabbitMQ:
+A professional, minimal Go example of asynchronous communication between microservices using RabbitMQ.
 
-- **producer**: expõe endpoint HTTP e publica mensagens na fila.
-- **consumer**: consome a fila e imprime no log.
+## Architecture
 
-> Objetivo didático (simples, sem foco em robustez).
+This repository contains two services connected by RabbitMQ:
 
-## Subir com Docker Compose
+1. **order-service**
+   - Exposes an HTTP API to place orders.
+   - Publishes an `order.placed` event to the `order.events` queue.
+
+2. **payment-service**
+   - Consumes `order.placed` events from the `order.events` queue.
+   - Simulates payment processing and logs payment outcome.
+
+RabbitMQ acts as the event bridge between these services.
+
+## Tech Stack
+
+- Go 1.22
+- RabbitMQ (management image)
+- Docker Compose
+
+## Run with Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-Serviços:
-- Producer HTTP: `http://localhost:8080`
-- RabbitMQ UI: `http://localhost:15672` (usuário/senha: `guest`/`guest`)
+### Endpoints and Ports
 
-## Publicar mensagem
+- Order Service API: `http://localhost:8080`
+- RabbitMQ Management UI: `http://localhost:15672`
+- RabbitMQ credentials: `guest` / `guest`
+
+## Place an Order
 
 ```bash
-curl -X POST http://localhost:8080/publish \
+curl -X POST http://localhost:8080/orders \
   -H "Content-Type: application/json" \
-  -d '{"name":"joao","message":"ola rabbit"}'
+  -d '{
+    "order_id": "ORD-1001",
+    "customer_id": "CUS-789",
+    "amount": 149.90,
+    "currency": "USD"
+  }'
 ```
 
-Resposta esperada:
+Expected response:
 
 ```json
-{"status":"mensagem publicada"}
+{
+  "message": "order accepted and published for payment processing",
+  "order_id": "ORD-1001",
+  "status": "accepted"
+}
 ```
 
-## Ver consumo
+## Check Payment Processing
 
-Veja os logs do container `consumer`. Ele exibirá algo como:
+Watch the `payment-service` logs:
+
+```bash
+docker compose logs -f payment-service
+```
+
+Expected log format:
 
 ```text
-[EVENTO] name=joao message=ola rabbit created_at=2026-01-01T12:00:00Z
+[PAYMENT_PROCESSED] order_id=ORD-1001 customer_id=CUS-789 amount=149.90 currency=USD payment_status=approved duration_ms=512
 ```
 
-## Rodar local sem Docker (opcional)
+## Run Locally Without Docker (Optional)
 
-1. Tenha um RabbitMQ com plugin de management rodando local em `http://localhost:15672`
-2. Em terminais separados:
+1. Start RabbitMQ with management plugin enabled.
+2. Run services in separate terminals:
 
 ```bash
 RABBITMQ_HTTP_URL=http://localhost:15672 go run ./cmd/consumer
@@ -51,3 +83,5 @@ RABBITMQ_HTTP_URL=http://localhost:15672 go run ./cmd/consumer
 ```bash
 RABBITMQ_HTTP_URL=http://localhost:15672 go run ./cmd/producer
 ```
+
+3. Call `POST /orders` as shown above.

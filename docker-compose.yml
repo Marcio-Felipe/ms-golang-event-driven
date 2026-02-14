@@ -5,7 +5,7 @@ services:
       - "5672:5672"
       - "15672:15672"
 
-  producer:
+  order-service:
     build:
       context: .
       dockerfile: Dockerfile.producer
@@ -18,7 +18,7 @@ services:
     ports:
       - "8080:8080"
 
-  consumer:
+  payment-service:
     build:
       context: .
       dockerfile: Dockerfile.consumer

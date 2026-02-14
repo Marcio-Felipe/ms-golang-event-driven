@@ -3,30 +3,42 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/example/ms-golang-event-driven/internal/rabbitmq"
 )
 
-const queueName = "training.events"
+const queueName = "order.events"
 
-type trainingMessage struct {
-	Name      string    `json:"name"`
-	Message   string    `json:"message"`
-	CreatedAt time.Time `json:"created_at"`
+type placeOrderRequest struct {
+	OrderID    string  `json:"order_id"`
+	CustomerID string  `json:"customer_id"`
+	Amount     float64 `json:"amount"`
+	Currency   string  `json:"currency"`
+}
+
+type orderPlacedEvent struct {
+	EventID   string            `json:"event_id"`
+	EventType string            `json:"event_type"`
+	Source    string            `json:"source"`
+	Occurred  time.Time         `json:"occurred_at"`
+	Data      placeOrderRequest `json:"data"`
 }
 
 func main() {
 	client := rabbitmq.NewClient()
 	if err := client.DeclareQueue(queueName); err != nil {
-		log.Fatalf("falha ao declarar fila: %v", err)
+		log.Fatalf("failed to declare queue: %v", err)
 	}
 
-	log.Println("consumer aguardando mensagens...")
+	log.Println("payment-service listening for order events...")
+	rand.Seed(time.Now().UnixNano())
+
 	for {
 		body, err := client.GetOne(queueName)
 		if err != nil {
-			log.Printf("erro ao buscar mensagem: %v", err)
+			log.Printf("failed to fetch event: %v", err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
@@ -36,12 +48,34 @@ func main() {
 			continue
 		}
 
-		var payload trainingMessage
-		if err := json.Unmarshal(body, &payload); err != nil {
-			log.Printf("mensagem invalida: %s", string(body))
+		var event orderPlacedEvent
+		if err := json.Unmarshal(body, &event); err != nil {
+			log.Printf("invalid event payload: %s", string(body))
 			continue
 		}
 
-		log.Printf("[EVENTO] name=%s message=%s created_at=%s", payload.Name, payload.Message, payload.CreatedAt.Format(time.RFC3339))
+		processPayment(event)
 	}
+}
+
+func processPayment(event orderPlacedEvent) {
+	startedAt := time.Now()
+
+	// Simulated gateway latency
+	time.Sleep(time.Duration(300+rand.Intn(400)) * time.Millisecond)
+
+	status := "approved"
+	if event.Data.Amount > 10000 {
+		status = "manual_review"
+	}
+
+	log.Printf(
+		"[PAYMENT_PROCESSED] order_id=%s customer_id=%s amount=%.2f currency=%s payment_status=%s duration_ms=%d",
+		event.Data.OrderID,
+		event.Data.CustomerID,
+		event.Data.Amount,
+		event.Data.Currency,
+		status,
+		time.Since(startedAt).Milliseconds(),
+	)
 }
