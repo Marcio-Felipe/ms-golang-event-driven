@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 type Client struct {
@@ -38,7 +39,9 @@ func NewClient() *Client {
 		baseURL:  strings.TrimRight(base, "/"),
 		username: user,
 		password: pass,
-		http:     &http.Client{},
+		http: &http.Client{
+			Timeout: 10 * time.Second,
+		},
 	}
 }
 
@@ -82,7 +85,7 @@ func (c *Client) GetOne(queue string) ([]byte, error) {
 
 	payloadValue, ok := out[0]["payload"].(string)
 	if !ok {
-		return nil, fmt.Errorf("payload ausente na resposta")
+		return nil, fmt.Errorf("response payload was not found")
 	}
 
 	return []byte(payloadValue), nil
@@ -113,7 +116,7 @@ func (c *Client) doRequest(method, path string, body any, out any) error {
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("rabbitmq retornou status %d: %s", res.StatusCode, string(respBody))
+		return fmt.Errorf("rabbitmq returned status %d: %s", res.StatusCode, string(respBody))
 	}
 
 	if out != nil {
